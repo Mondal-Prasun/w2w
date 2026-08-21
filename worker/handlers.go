@@ -3,15 +3,21 @@ package worker
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"mime/multipart"
 	"net/http"
+	"os"
 
 	"github.com/Mondal-Prasun/w2w/job"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
 type Worker struct {
-	Ctx context.Context
-	Rdb *redis.Client
+	Ctx          context.Context
+	Rdb          *redis.Client
+	UploadFolder string
 }
 
 const (
@@ -37,6 +43,16 @@ func (w *Worker) Checkhealth(res http.ResponseWriter, req *http.Request) {
 		Msg: "Server is live ",
 	})
 
+}
+
+func (w *Worker) CheckRedisServer() error {
+	rdbCmd := w.Rdb.Ping(w.Ctx)
+
+	if rdbCmd.Err() != nil {
+		return rdbCmd.Err()
+	}
+
+	return nil
 }
 
 func (w *Worker) AppendJob(res http.ResponseWriter, req *http.Request) {
@@ -67,23 +83,75 @@ func (w *Worker) AppendJob(res http.ResponseWriter, req *http.Request) {
 
 	defer jf.Close()
 
-	switch jobT {
-	case job.Rescale.ToString():
-		fmt.Println("rescale job")
-	case job.Segmentaion.ToString():
-		fmt.Println("segmentation job")
-	case job.Thumbnail.ToString():
-		fmt.Println("thumbnail job")
+	workerJob := &job.Job{}
+
+	uuid, err := uuid.NewV7()
+
+	if err != nil {
+		response.error(502, "Server error")
+		log.Println(err)
+		return
 	}
 
-	fmt.Println(jh.Filename)
+	workerJob.JobUniqueId = uuid.String()
+	workerJob.Status = job.Pending
 
-	response.success(200, struct {
-		JobType  string `json:"JobType"`
-		FileName string `json:"FileName"`
-	}{
-		JobType:  jobT,
-		FileName: jh.Filename,
-	})
+	switch jobT {
+	case string(job.Rescale):
+		workerJob.JobType = job.Rescale
+	case string(job.Segmentaion):
+		workerJob.JobType = job.Segmentaion
+	case string(job.Thumbnail):
+		workerJob.JobType = job.Thumbnail
+	default:
+		response.error(303, "Cannot make the request")
+		return
+	}
+
+	log.Println(jh.Filename)
+
+	uploadPath, err := w.writeToUploadFolder(jf, jh, workerJob.JobUniqueId)
+
+	if err != nil {
+		response.error(502, "Server error")
+		log.Println(err)
+		return
+	}
+
+	workerJob.JobFileDestination = uploadPath
+
+	w.AddJobs(workerJob)
+
+	response.success(200, workerJob)
+
+}
+
+func (w *Worker) writeToUploadFolder(file multipart.File, stat *multipart.FileHeader, jobId string) (path string, uploadErr error) {
+
+	uploadFileDir := fmt.Sprintf("%v/%v", w.UploadFolder, jobId)
+
+	err := os.MkdirAll(uploadFileDir, os.ModeDir)
+
+	if err != nil {
+		return "", err
+	}
+
+	uploadPath := fmt.Sprintf("%v/%v/%v", w.UploadFolder, jobId, stat.Filename)
+
+	f, err := os.Create(uploadPath)
+
+	if err != nil {
+		return "", err
+	}
+
+	defer f.Close()
+
+	_, err = io.Copy(f, file)
+
+	if err != nil {
+		return "", err
+	}
+
+	return uploadPath, nil
 
 }

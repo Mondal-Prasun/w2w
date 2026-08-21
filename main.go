@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -26,25 +27,25 @@ func main() {
 	httpServerMux := http.NewServeMux()
 
 	worker := worker.Worker{
-		Ctx: context.Background(),
-		Rdb: initRedis(rAddr),
+		Ctx:          context.Background(),
+		Rdb:          initRedis(rAddr),
+		UploadFolder: uploadDirectory,
 	}
 
-	fmt.Printf("Redis server connected on addr : %v \n", rAddr)
-	// r := worker.Rdb.ClientGetName(worker.Ctx)
+	err := worker.CheckRedisServer()
 
-	// rName, err := r.Result()
+	if err != nil {
+		log.Panic(err)
+	}
 
-	// if err != nil {
-	// 	panic(err)
-	// }
+	log.Printf("Redis server connected on addr : %v \n", rAddr)
 
-	// fmt.Printf("Redis server connection name: %v", rName)
+	worker.ProcessJobs()
 
 	httpServerMux.HandleFunc("/checkHealth", worker.Checkhealth)
 	httpServerMux.HandleFunc("/acceptJob", worker.AppendJob)
 
-	fmt.Printf("Server is listening on %v \n", sPort)
+	log.Printf("Server is listening on %v \n", sPort)
 	http.ListenAndServe(sPort, httpServerMux)
 
 }

@@ -1,44 +1,24 @@
 package job
 
-type JobTypes interface {
-	ToString() string
-}
-
-type thumbnail struct{}
-type segmentation struct{}
-type rescale struct{}
-
-func (thumbnail) ToString() string    { return "Thumbnail" }
-func (segmentation) ToString() string { return "Segmentation" }
-func (rescale) ToString() string      { return "Rescale" }
+type JobTypes string
 
 var (
-	Thumbnail   JobTypes = thumbnail{}
-	Segmentaion JobTypes = segmentation{}
-	Rescale     JobTypes = rescale{}
+	Thumbnail   JobTypes = "Thumbnail"
+	Segmentaion JobTypes = "Segmentation"
+	Rescale     JobTypes = "rescale"
 )
 
-type JobStatus interface {
-	ToString() string
-}
-
-type done struct{}
-type pending struct{}
-type failed struct{}
-
-func (done) ToString() string    { return "Done" }
-func (pending) ToString() string { return "Pending" }
-func (failed) ToString() string  { return "Failed" }
+type JobStatus string
 
 var (
-	Done    JobStatus = done{}
-	Pending JobStatus = pending{}
-	Failed  JobStatus = failed{}
+	Done    JobStatus = "Done"
+	Pending JobStatus = "Pending"
+	Failed  JobStatus = "Failed"
 )
 
 type Job struct {
-	JobUniqueId        string
-	JobFileDestination string
-	JobType            JobTypes
-	Status             JobStatus
+	JobUniqueId        string    `json:"JobUniqueId"`
+	JobFileDestination string    `json:"JobFileDestination"`
+	JobType            JobTypes  `json:"JobType"`
+	Status             JobStatus `json:"Status"`
 }
