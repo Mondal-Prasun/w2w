@@ -1,13 +1,16 @@
 package worker
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/Mondal-Prasun/w2w/job"
 	"github.com/google/uuid"
@@ -15,13 +18,14 @@ import (
 )
 
 type Worker struct {
-	Ctx          context.Context
-	Rdb          *redis.Client
-	UploadFolder string
+	Ctx              context.Context
+	Rdb              *redis.Client
+	UploadFolder     string
+	ProcessJobFolder string
 }
 
 const (
-	maxFromSize int64  = 100 * 1024 * 1024
+	maxFromSize int64  = 32 << 10
 	jobType     string = "jobType"
 	jobFile     string = "jobFile"
 )
@@ -108,7 +112,7 @@ func (w *Worker) AppendJob(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Println(jh.Filename)
+	// log.Println(jh.Filename)
 
 	uploadPath, err := w.writeToUploadFolder(jf, jh, workerJob.JobUniqueId)
 
@@ -123,6 +127,34 @@ func (w *Worker) AppendJob(res http.ResponseWriter, req *http.Request) {
 	w.AddJobs(workerJob)
 
 	response.success(200, workerJob)
+
+}
+
+func (w *Worker) GetJobStatus(res http.ResponseWriter, req *http.Request) {
+	response := Response{
+		w: res,
+	}
+	if req.Method != http.MethodGet {
+		response.error(502, "Bad Gate Way")
+		return
+	}
+
+	jobId := req.PathValue("jobId")
+
+	if jobId == "" {
+		response.error(302, "Cannot find JodId")
+		return
+	}
+
+	jobDetails, err := w.JobDetails(jobId)
+
+	if err != nil {
+		log.Println(err)
+		response.error(500, "Internal server error")
+		return
+	}
+
+	response.success(200, jobDetails)
 
 }
 
@@ -153,5 +185,82 @@ func (w *Worker) writeToUploadFolder(file multipart.File, stat *multipart.FileHe
 	}
 
 	return uploadPath, nil
+
+}
+
+func (w *Worker) DowloadDoneJob(res http.ResponseWriter, req *http.Request) {
+	response := Response{
+		w: res,
+	}
+
+	if req.Method != http.MethodGet {
+		response.error(502, "Bad gateway")
+		return
+	}
+
+	jobId := req.PathValue("jobId")
+
+	if jobId == "" {
+		response.error(302, "cannot find jod Id")
+		return
+	}
+
+	outPutFolder := w.ProcessJobFolder + "/" + jobId
+
+	if _, err := os.Stat(outPutFolder); os.IsNotExist(err) {
+		response.error(302, "cannot find the download folder")
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/zip")
+	res.Header().Set("Content-Disposition", "attachment; filename=\"job_"+jobId+".zip\"")
+
+	zipWriter := zip.NewWriter(res)
+
+	defer zipWriter.Close()
+
+	err := filepath.Walk(outPutFolder, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(path)
+
+		if err != nil {
+			return err
+		}
+
+		defer file.Close()
+
+		relPath, err := filepath.Rel(outPutFolder, path)
+
+		if err != nil {
+			return err
+		}
+
+		zipFileEntry, err := zipWriter.Create(relPath)
+
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(zipFileEntry, file)
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+
+	})
+
+	if err != nil {
+		log.Printf("Cannot download file: %v", err)
+		return
+	}
 
 }

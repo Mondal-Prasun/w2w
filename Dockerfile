@@ -11,6 +11,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o w2w .
 
 FROM alpine:latest
 
+RUN apk add --no-cache ffmpeg
+
 WORKDIR /app
 
 COPY --from=builder /app/w2w .

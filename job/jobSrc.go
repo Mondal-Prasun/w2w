@@ -17,8 +17,13 @@ var (
 )
 
 type Job struct {
-	JobUniqueId        string    `json:"JobUniqueId"`
-	JobFileDestination string    `json:"JobFileDestination"`
-	JobType            JobTypes  `json:"JobType"`
-	Status             JobStatus `json:"Status"`
+	JobUniqueId                 string   `json:"JobUniqueId"`
+	JobFileDestination          string   `json:"JobFileDestination"`
+	JobProcessFolderDestination string   `json:"JobProcessFolderDestination"`
+	JobType                     JobTypes `json:"JobType"`
+	JobArgs                     struct {
+		InPixel string `json:"InPixel"`
+		InRatio string `json:"InRatio"`
+	}
+	Status JobStatus `json:"Status"`
 }

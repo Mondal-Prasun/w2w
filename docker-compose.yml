@@ -8,6 +8,9 @@ services:
     environment:
       - REDIS_ADDR=redis_server:6379
       - SERVER_ADDR=:8080
+    volumes:
+      - app_uploads:/app/upload
+      - app_process_job:/app/processJobs
     depends_on:
       redis:
         condition: service_healthy
@@ -27,3 +30,5 @@ services:
 
 volumes:
   redis_data:
+  app_uploads:
+  app_process_job:
