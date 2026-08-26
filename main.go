@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
-	"github.com/Mondal-Prasun/w2w/worker"
-	"github.com/redis/go-redis/v9"
+	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/Mondal-Prasun/w2w/worker"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -15,7 +19,12 @@ const (
 	redisPort            string = "REDIS_ADDR"
 	uploadDirectory      string = "./upload"
 	processJobsDirectory string = "./processJobs"
+	staticJSFolderPath   string = "ui/static"
+	templateHTMLFilePath string = "ui/template/index.html"
 )
+
+//go:embed ui/*
+var uiFS embed.FS
 
 func main() {
 
@@ -42,6 +51,26 @@ func main() {
 	log.Printf("Redis server connected on addr : %v \n", rAddr)
 
 	worker.ProcessJobs()
+
+	tmpl, err := template.ParseFS(uiFS, templateHTMLFilePath)
+
+	if err != nil {
+		log.Panicf("Cannot parse template : %v", err)
+	}
+
+	staticFs, err := fs.Sub(uiFS, staticJSFolderPath)
+
+	if err != nil {
+		log.Panicf("Cannot parse static folder : %v", err)
+	}
+
+	httpServerMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFs))))
+
+	httpServerMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		tmpl.Execute(w, nil)
+	})
 
 	httpServerMux.HandleFunc("/checkHealth", worker.Checkhealth)
 	httpServerMux.HandleFunc("/acceptJob", worker.AppendJob)

@@ -14,7 +14,7 @@ const (
 	queueKey     string = "Queue:Jobs"
 	jobHashKey   string = "Job:"
 	failedJobKey string = "Job:Failed:"
-	workerNumber uint8  = 4
+	workerNumber uint8  = 3
 )
 
 func (w *Worker) ProcessJobs() {
@@ -26,7 +26,7 @@ func (w *Worker) ProcessJobs() {
 			for job := range jobChan {
 
 				log.Printf("Woker number is :%v \n", workerId)
-				go w.workOnJob(&job)
+				w.workOnJob(&job)
 			}
 		}(i)
 	}
@@ -136,10 +136,17 @@ func (w *Worker) workOnJob(jobDet *job.Job) {
 
 	switch jobDet.JobType {
 	case job.Rescale:
-		log.Println("Not implemented")
+
+		w.generateRescale(jobDet)
+
 	case job.Segmentaion:
+
+		w.generateHLSSegmentation(jobDet)
+
 	case job.Thumbnail:
+
 		w.generateThumbnail(jobDet)
+
 	}
 
 }

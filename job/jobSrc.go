@@ -5,7 +5,7 @@ type JobTypes string
 var (
 	Thumbnail   JobTypes = "Thumbnail"
 	Segmentaion JobTypes = "Segmentation"
-	Rescale     JobTypes = "rescale"
+	Rescale     JobTypes = "Rescale"
 )
 
 type JobStatus string

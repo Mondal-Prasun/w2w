@@ -263,4 +263,12 @@ func (w *Worker) DowloadDoneJob(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if err := os.RemoveAll(outPutFolder); err != nil {
+		log.Println("Cannot remove file: " + outPutFolder)
+	}
+
+	if err := os.RemoveAll(w.UploadFolder + "/" + jobId); err != nil {
+		log.Println("Cannot remove file: " + outPutFolder)
+	}
+
 }
